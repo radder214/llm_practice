@@ -7,3 +7,8 @@
 
 ### [240921]
 - Jupyter Notebook 설치 및 실행 테스트 완료
+
+### [240927 ~ 240928]
+- Chat GPT 유료 구독
+- String predict TO LLM, chat model
+- messages predict TO chat model
