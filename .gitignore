@@ -1,4 +1,4 @@
 /env
 .env
 /참고
-.cache/
+/6_RAG/cache/
