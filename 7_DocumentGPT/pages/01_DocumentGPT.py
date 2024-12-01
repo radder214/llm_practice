@@ -27,6 +27,8 @@ st.title("Document GPT")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+
+# 사용자 입력 message 화면 출력 & session_state 저장
 def send_message(message, role, save=True): # save=True --> default parameter
     with st.chat_message(role):
         st.write(message)
@@ -36,12 +38,15 @@ def send_message(message, role, save=True): # save=True --> default parameter
             "role"    : role
         })
 
+
 # session_state를 이용해 대화 기록 화면에 뿌리기
 for message in st.session_state.messages:
     send_message(message["message"], message["role"], False)
 
+
+# 사용자 질문 입력 ==> 화면에 뿌리기 & session_state 저장
 message = st.chat_input("Send a message to the AI")
 if message:
     send_message(message, "human")
-    time.sleep(2)
+    time.sleep(2) # 2초 대기
     send_message(f"You said: {message}", "ai")
