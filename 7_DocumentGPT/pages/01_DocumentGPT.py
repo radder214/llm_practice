@@ -8,6 +8,9 @@ from langchain_openai           import OpenAIEmbeddings
 from langchain.vectorstores     import Chroma, FAISS
 from langchain.embeddings       import CacheBackedEmbeddings
 from langchain.storage          import LocalFileStore
+from langchain.prompts          import ChatPromptTemplate
+from langchain.schema.runnable  import RunnableLambda, RunnablePassthrough
+from langchain_openai           import ChatOpenAI
 
 st.set_page_config(page_title="Document GPT", page_icon="📖")
 st.title("Document GPT")
@@ -16,6 +19,8 @@ st.markdown("""
     ##### Use this chatbot to ask questions to an AI about your files!
     ##### Upload your files on the sidebar.
 """)
+
+llm = ChatOpenAI(temperature=0.1)
 
 # @st.cache_data ==> decorator
     # 사용자의 질문이 들어올 때 마다 load, split, embedding 등을 할 수는 없다.
@@ -86,7 +91,22 @@ def paint_history():
     for message in st.session_state.messages:
         send_message(message["message"], message["role"], False)
 
+def format_docs(docs):
+    # List Comprehension
+    return "\n\n".join(document.page_content for document in docs) # "🔥".join(["1", "2", "3"]) --> 1🔥2🔥3
 
+# chat template
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", """
+            Answer the question using ONLY the following context. If you don't know the answer
+            just say you don't know. DON'T make anything up.
+        
+            context: {context}
+        """),
+        ("human", "{question}")
+    ]
+)
 
 # 사용자가 본인 파일 upload
 with st.sidebar:
@@ -107,11 +127,22 @@ if file:
     message = st.chat_input("Ask anything about your file")
     if message:
         send_message(message, "human")
-        # 사용자 질문을 retriever에 던져서 질문과 관련된 Document를 가져온다.
-        docs = retriever.invoke(message)
-        # 각 Document의 page_content를 합쳐서 템플릿에 넣는다. using List Comprehension
-        docs = "\n\n".join(document.page_content for document in docs) # "🔥".join(["1", "2", "3"]) --> 1🔥2🔥3
-        st.write(docs)
+        chain = { # stuff chain을 만들 것이다.
+            # ⚠️Langchain은 사용자의 input을 이용해 retriever를 자동으로 invoke(실행) 한다. ==> retriever.invoke(message)
+            # RunnableLambda
+                # LangChain에서 일반 Python 함수를 Runnable 객체로 변환해 파이프라인에 쉽게 통합할 수 있게 해주는 클래스
+                # 개발자 정의 함수를 LangChain 워크플로우에 유연하게 추가하고 다양한 데이터 처리 및 변환 작업을 수행할 수 있다.
+            "context"   : retriever | RunnableLambda(format_docs),
+            "question"  : RunnablePassthrough() # 사용자의 message는 이곳을 지나간다.(message를 relay 해준다.)
+        } | prompt | llm
+        response = chain.invoke(message) # message = 사용자의 input(=chain의 input)
+        send_message(response.content, "ai")
+
+        # ============== 위의 chain이 아래 작업의 요약이다. ==============
+        # docs = retriever.invoke(message)
+        # docs = "\n\n".join(document.page_content for document in docs)
+        # propmt = prompt.format_messages(context = docs, question = message)
+        # llm.predict_messages(propmt)
 else :
     # 1. 기존에 upload 한 파일을 더 이상 사용하지 않고, 다른 파일을 upload 후 사용하고 싶을 때
     # 2. 화면에 처음 들어 왔을 때에도 아래 코드가 실행된다.(file 변수의 값이 없으므로)
